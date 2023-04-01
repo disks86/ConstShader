@@ -55,6 +55,7 @@ namespace cs
             mNextId += numberToSkip;
         }
 
+        template<typename... Args>
         void Push(spv::Op code, Args... args)
         {
             Push(code, args...);
