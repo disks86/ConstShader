@@ -68,17 +68,80 @@ namespace cs
         _mat4=22
     };
 
+    struct type_definition;
+    struct var;
+
+    struct type_definition
+        : std::vector<var>
+    {
+
+    };
+
+    struct var
+    {
+        std::variant<data_type, type_definition> mType;
+        std::string mName;
+
+        var(data_type type, const std::string& name)
+         : mType(type), mName(name)
+        {
+            
+        }
+
+        var(type_definition type, const std::string& name)
+         : mType(type), mName(name)
+        {
+            
+        }
+
+        var(data_type type)
+         : mType(type)
+        {
+            
+        }
+
+        var(type_definition type)
+         : mType(type)
+        {
+            
+        }
+
+        var(const var &obj)
+            : mType(obj.mType), mName(obj.mName)
+        {
+            
+        }
+
+        var(var &&obj)
+            : mType(obj.mType), mName(obj.mName)
+        { 
+            
+        }
+    };
+
     struct layout_location_chunk
     {
         size_t mLocation;
         parameter_direction mDirection;
-        data_type mType;
+        type_definition mType;
         std::string mName;
 
-        layout_location_chunk(size_t location, parameter_direction direction, data_type type, const std::string& name)
+        layout_location_chunk(size_t location, parameter_direction direction, type_definition type, const std::string& name)
          : mLocation(location), mDirection(direction), mType(type), mName(name)
         {
-            //TODO: implement
+ 
+        }
+
+        layout_location_chunk(size_t location, parameter_direction direction, std::initializer_list<var> type, const std::string& name)
+         : mLocation(location), mDirection(direction), mName(name)
+        {
+            mType.append_range(type);
+        }
+
+        layout_location_chunk(size_t location, parameter_direction direction, data_type type, const std::string& name)
+         : mLocation(location), mDirection(direction), mName(name)
+        {
+            mType.emplace_back(type);
         }
 
         layout_location_chunk(const layout_location_chunk &obj)
@@ -95,7 +158,84 @@ namespace cs
 
     };
 
-    using shader_chunk = std::variant<std::monostate, layout_location_chunk>;
+    struct layout_binding_chunk
+    {
+        size_t mBinding;
+        parameter_direction mDirection;
+        type_definition mType;
+        std::string mName;
+
+        layout_binding_chunk(size_t binding, type_definition type, const std::string& name)
+         : mBinding(binding), mType(type), mName(name)
+        {
+        }
+
+        layout_binding_chunk(size_t binding, std::initializer_list<var> type, const std::string& name)
+         : mBinding(binding), mName(name)
+        {
+            mType.append_range(type);
+        }
+
+        layout_binding_chunk(size_t binding, data_type type, const std::string& name)
+         : mBinding(binding), mName(name)
+        {
+            mType.emplace_back(type);
+        }
+
+        layout_binding_chunk(const layout_binding_chunk &obj)
+            : mBinding(obj.mBinding), mType(obj.mType), mName(obj.mName)
+        {
+            
+        }
+
+        layout_binding_chunk(layout_binding_chunk &&obj)
+            : mBinding(obj.mBinding), mType(obj.mType), mName(obj.mName)
+        { 
+            
+        }
+
+    };
+
+    struct layout_builtin_chunk
+    {
+        spv::BuiltIn mBuiltIn;
+        parameter_direction mDirection;
+        type_definition mType;
+        std::string mName;
+
+        layout_builtin_chunk(spv::BuiltIn builtIn, parameter_direction direction, type_definition type, const std::string& name)
+         : mBuiltIn(builtIn), mDirection(direction), mType(type), mName(name)
+        {
+ 
+        }
+
+        layout_builtin_chunk(spv::BuiltIn builtIn, parameter_direction direction, std::initializer_list<var> type, const std::string& name)
+         : mBuiltIn(builtIn), mDirection(direction), mName(name)
+        {
+            mType.append_range(type);
+        }
+
+        layout_builtin_chunk(spv::BuiltIn builtIn, parameter_direction direction, data_type type, const std::string& name)
+         : mBuiltIn(builtIn), mDirection(direction), mName(name)
+        {
+            mType.emplace_back(type);
+        }
+
+        layout_builtin_chunk(const layout_builtin_chunk &obj)
+            : mBuiltIn(obj.mBuiltIn), mDirection(obj.mDirection), mType(obj.mType), mName(obj.mName)
+        {
+            
+        }
+
+        layout_builtin_chunk(layout_builtin_chunk &&obj)
+            : mBuiltIn(obj.mBuiltIn), mDirection(obj.mDirection), mType(obj.mType), mName(obj.mName)
+        { 
+            
+        }
+
+    };
+
+    using shader_chunk = std::variant<std::monostate, layout_location_chunk, layout_binding_chunk, layout_builtin_chunk>;
 
     class shader
         : public std::vector<shader_chunk>
@@ -131,9 +271,57 @@ namespace cs
 
         public:
 
+        inline shader& layout_location(size_t location, parameter_direction direction, type_definition type, const std::string& name)
+        {
+            this->emplace_back(layout_location_chunk(location, direction, type, name));
+            return (*this);
+        }
+
+        inline shader& layout_location(size_t location, parameter_direction direction, std::initializer_list<var> type, const std::string& name)
+        {
+            this->emplace_back(layout_location_chunk(location, direction, type, name));
+            return (*this);
+        }
+
         inline shader& layout_location(size_t location, parameter_direction direction, data_type type, const std::string& name)
         {
             this->emplace_back(layout_location_chunk(location, direction, type, name));
+            return (*this);
+        }
+
+        inline shader& layout_binding(size_t binding, type_definition type, const std::string& name)
+        {
+            this->emplace_back(layout_binding_chunk(binding, type, name));
+            return (*this);
+        }
+
+        inline shader& layout_binding(size_t binding, std::initializer_list<var> type, const std::string& name)
+        {
+            this->emplace_back(layout_binding_chunk(binding, type, name));
+            return (*this);
+        }
+
+        inline shader& layout_binding(size_t binding, data_type type, const std::string& name)
+        {
+            this->emplace_back(layout_binding_chunk(binding, type, name));
+            return (*this);
+        }
+
+        inline shader& layout_builtin(spv::BuiltIn builtIn, parameter_direction direction, type_definition type, const std::string& name)
+        {
+            this->emplace_back(layout_builtin_chunk(builtIn, direction, type, name));
+            return (*this);
+        }
+
+        inline shader& layout_builtin(spv::BuiltIn builtIn, parameter_direction direction, std::initializer_list<var> type, const std::string& name)
+        {
+            this->emplace_back(layout_builtin_chunk(builtIn, direction, type, name));
+            return (*this);
+        }
+
+        inline shader& layout_builtin(spv::BuiltIn builtIn, parameter_direction direction, data_type type, const std::string& name)
+        {
+            this->emplace_back(layout_builtin_chunk(builtIn, direction, type, name));
             return (*this);
         }
 
