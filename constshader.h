@@ -43,33 +43,35 @@ namespace cs
 
     enum data_type
     {
-        _bool=0,
-        _int=1,
-        _uint=2,
-        _float=3,
-        _double=4,
-        _bvec2=5,
-        _bvec3=6,
-        _bvec4=7,
-        _ivec2=8,
-        _ivec3=9,
-        _ivec4=10,
-        _uvec2=11,
-        _uvec3=12,
-        _uvec4=13,
-        _vec2=14,
-        _vec3=15,
-        _vec4=16,
-        _dvec2=17,
-        _dvec3=18,
-        _dvec4=19,
-        _mat2=20,
-        _mat3=21,
-        _mat4=22
+        _void=0,
+        _bool=1,
+        _int=2,
+        _uint=3,
+        _float=4,
+        _double=5,
+        _bvec2=6,
+        _bvec3=7,
+        _bvec4=8,
+        _ivec2=9,
+        _ivec3=10,
+        _ivec4=11,
+        _uvec2=12,
+        _uvec3=13,
+        _uvec4=14,
+        _vec2=15,
+        _vec3=16,
+        _vec4=17,
+        _dvec2=18,
+        _dvec3=19,
+        _dvec4=20,
+        _mat2=21,
+        _mat3=22,
+        _mat4=23
     };
 
     struct type_definition;
     struct var;
+    struct expression;
 
     struct type_definition
         : std::vector<var>
@@ -88,7 +90,7 @@ namespace cs
             
         }
 
-        var(type_definition type, const std::string& name)
+        var(type_definition& type, const std::string& name)
          : mType(type), mName(name)
         {
             
@@ -100,7 +102,7 @@ namespace cs
             
         }
 
-        var(type_definition type)
+        var(type_definition& type)
          : mType(type)
         {
             
@@ -119,6 +121,31 @@ namespace cs
         }
     };
 
+    struct expression
+    {
+        var mResult;
+        std::vector<std::variant<var,expression>> mArguments;
+
+        expression(var result, std::initializer_list<std::variant<var,expression>> arguments)
+         : mResult(result), mArguments(arguments)
+        {
+
+        }
+
+        expression(const expression &obj)
+            : mResult(obj.mResult), mArguments(obj.mArguments)
+        {
+            
+        }
+
+        expression(expression &&obj)
+            : mResult(obj.mResult), mArguments(obj.mArguments)
+        { 
+            
+        }
+
+    };
+
     struct layout_location_chunk
     {
         size_t mLocation;
@@ -126,7 +153,7 @@ namespace cs
         type_definition mType;
         std::string mName;
 
-        layout_location_chunk(size_t location, parameter_direction direction, type_definition type, const std::string& name)
+        layout_location_chunk(size_t location, parameter_direction direction, type_definition& type, const std::string& name)
          : mLocation(location), mDirection(direction), mType(type), mName(name)
         {
  
@@ -165,7 +192,7 @@ namespace cs
         type_definition mType;
         std::string mName;
 
-        layout_binding_chunk(size_t binding, type_definition type, const std::string& name)
+        layout_binding_chunk(size_t binding, type_definition& type, const std::string& name)
          : mBinding(binding), mType(type), mName(name)
         {
         }
@@ -203,7 +230,7 @@ namespace cs
         type_definition mType;
         std::string mName;
 
-        layout_builtin_chunk(spv::BuiltIn builtIn, parameter_direction direction, type_definition type, const std::string& name)
+        layout_builtin_chunk(spv::BuiltIn builtIn, parameter_direction direction, type_definition& type, const std::string& name)
          : mBuiltIn(builtIn), mDirection(direction), mType(type), mName(name)
         {
  
@@ -235,7 +262,45 @@ namespace cs
 
     };
 
-    using shader_chunk = std::variant<std::monostate, layout_location_chunk, layout_binding_chunk, layout_builtin_chunk>;
+    struct function_chunk
+    {
+        type_definition mReturnType;
+        std::string mName;
+        std::vector<var> mArguments;
+        std::vector<expression> mExpressions;
+
+        function_chunk(type_definition& returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+         : mReturnType(returnType), mName(name), mArguments(arguments), mExpressions(expressions)
+        {
+
+        }
+
+        function_chunk(std::initializer_list<var> returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+         : mName(name), mArguments(arguments), mExpressions(expressions)
+        {
+            mReturnType.append_range(returnType);
+        }
+
+        function_chunk(data_type returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+         : mName(name), mArguments(arguments), mExpressions(expressions)
+        {
+            mReturnType.emplace_back(returnType);
+        }
+
+        function_chunk(const function_chunk &obj)
+            : mReturnType(obj.mReturnType), mName(obj.mName), mArguments(obj.mArguments)
+        {
+            
+        }
+
+        function_chunk(function_chunk &&obj)
+            : mReturnType(obj.mReturnType), mName(obj.mName), mArguments(obj.mArguments)
+        { 
+            
+        }
+    };
+
+    using shader_chunk = std::variant<std::monostate, layout_location_chunk, layout_binding_chunk, layout_builtin_chunk, function_chunk>;
 
     class shader
         : public std::vector<shader_chunk>
@@ -271,7 +336,7 @@ namespace cs
 
         public:
 
-        inline shader& layout_location(size_t location, parameter_direction direction, type_definition type, const std::string& name)
+        inline shader& layout_location(size_t location, parameter_direction direction, type_definition& type, const std::string& name)
         {
             this->emplace_back(layout_location_chunk(location, direction, type, name));
             return (*this);
@@ -289,7 +354,7 @@ namespace cs
             return (*this);
         }
 
-        inline shader& layout_binding(size_t binding, type_definition type, const std::string& name)
+        inline shader& layout_binding(size_t binding, type_definition& type, const std::string& name)
         {
             this->emplace_back(layout_binding_chunk(binding, type, name));
             return (*this);
@@ -307,7 +372,7 @@ namespace cs
             return (*this);
         }
 
-        inline shader& layout_builtin(spv::BuiltIn builtIn, parameter_direction direction, type_definition type, const std::string& name)
+        inline shader& layout_builtin(spv::BuiltIn builtIn, parameter_direction direction, type_definition& type, const std::string& name)
         {
             this->emplace_back(layout_builtin_chunk(builtIn, direction, type, name));
             return (*this);
@@ -322,6 +387,24 @@ namespace cs
         inline shader& layout_builtin(spv::BuiltIn builtIn, parameter_direction direction, data_type type, const std::string& name)
         {
             this->emplace_back(layout_builtin_chunk(builtIn, direction, type, name));
+            return (*this);
+        }
+
+        inline shader& function(type_definition& returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+        {
+            this->emplace_back(function_chunk(returnType, name, arguments, expressions));
+            return (*this);
+        }
+
+        inline shader& function(std::initializer_list<var>& returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+        {
+            this->emplace_back(function_chunk(returnType, name, arguments, expressions));
+            return (*this);
+        }
+
+        inline shader& function(data_type returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+        {
+            this->emplace_back(function_chunk(returnType, name, arguments, expressions));
             return (*this);
         }
 
