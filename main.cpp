@@ -5,7 +5,7 @@
 
 int main()
 {    
-     auto shader = cs::shader()
+     auto vert_shader = cs::shader()
         .layout_location(0, cs::in, cs::_vec3, "inPos")
         .layout_location(1, cs::in, cs::_vec3, "inColor")
 
@@ -22,7 +22,7 @@ int main()
 
         .function(cs::_void,"main",{},
         {
-            
+            cs::var("outColor") = cs::var("inColor")
         });
 
 

@@ -70,81 +70,133 @@ namespace cs
     };
 
     struct type_definition;
-    struct var;
+    struct variable;
     struct expression;
 
+    using operand = std::variant<variable,expression>;
+
     struct type_definition
-        : std::vector<var>
+        : std::vector<variable>
     {
 
     };
 
-    struct var
+    struct variable
     {
-        std::variant<data_type, type_definition> mType;
+        std::variant<std::monostate,data_type, type_definition> mType;
         std::string mName;
 
-        var(data_type type, const std::string& name)
+        inline variable()
+        {
+            
+        }
+
+        inline variable(const std::string& name)
+         : mName(name)
+        {
+            
+        }
+
+        inline variable(data_type type, const std::string& name)
          : mType(type), mName(name)
         {
             
         }
 
-        var(type_definition& type, const std::string& name)
+        inline variable(type_definition& type, const std::string& name)
          : mType(type), mName(name)
         {
             
         }
 
-        var(data_type type)
+        inline variable(data_type type)
          : mType(type)
         {
             
         }
 
-        var(type_definition& type)
+        inline variable(type_definition& type)
          : mType(type)
         {
             
         }
 
-        var(const var &obj)
+        inline variable(const variable &obj)
             : mType(obj.mType), mName(obj.mName)
         {
             
         }
 
-        var(var &&obj)
+        inline variable(variable &&obj)
             : mType(obj.mType), mName(obj.mName)
         { 
             
+        }
+
+        inline void operator = (const variable &v) 
+        { 
+            mType = v.mType;
+            mName = v.mName;
         }
     };
 
     struct expression
     {
-        var mResult;
-        std::vector<std::variant<var,expression>> mArguments;
+        variable mResult;
+        std::vector<variable> mArguments;
+        spv::Op mOpCode;
 
-        expression(var result, std::initializer_list<std::variant<var,expression>> arguments)
-         : mResult(result), mArguments(arguments)
+        inline expression(std::initializer_list<variable> arguments)
+         : mArguments(arguments)
         {
 
         }
 
-        expression(const expression &obj)
+        inline expression(variable result, std::initializer_list<variable> arguments)
+         : mResult(result), mArguments(arguments)
+        {
+        }
+
+        inline expression(const expression &obj)
             : mResult(obj.mResult), mArguments(obj.mArguments)
         {
             
         }
 
-        expression(expression &&obj)
+        inline expression(expression &&obj)
             : mResult(obj.mResult), mArguments(obj.mArguments)
         { 
             
         }
 
+        inline expression& operator = (const expression &o) 
+        { 
+            mResult = mArguments.back();
+            mArguments.pop_back();
+
+            mArguments = o.mArguments;
+
+            mOpCode = spv::OpStore;
+
+            return (*this);
+        }
+
     };
+
+    expression var(const std::string& name)
+    {
+        return {variable(name)};
+    }
+
+    variable var(data_type type, const std::string& name)
+    {
+        return variable(type, name);
+    }
+
+    variable var(type_definition type, const std::string& name)
+    {
+        return variable(type, name);
+    }
 
     struct layout_location_chunk
     {
@@ -159,7 +211,7 @@ namespace cs
  
         }
 
-        layout_location_chunk(size_t location, parameter_direction direction, std::initializer_list<var> type, const std::string& name)
+        layout_location_chunk(size_t location, parameter_direction direction, std::initializer_list<variable> type, const std::string& name)
          : mLocation(location), mDirection(direction), mName(name)
         {
             mType.append_range(type);
@@ -197,7 +249,7 @@ namespace cs
         {
         }
 
-        layout_binding_chunk(size_t binding, std::initializer_list<var> type, const std::string& name)
+        layout_binding_chunk(size_t binding, std::initializer_list<variable> type, const std::string& name)
          : mBinding(binding), mName(name)
         {
             mType.append_range(type);
@@ -236,7 +288,7 @@ namespace cs
  
         }
 
-        layout_builtin_chunk(spv::BuiltIn builtIn, parameter_direction direction, std::initializer_list<var> type, const std::string& name)
+        layout_builtin_chunk(spv::BuiltIn builtIn, parameter_direction direction, std::initializer_list<variable> type, const std::string& name)
          : mBuiltIn(builtIn), mDirection(direction), mName(name)
         {
             mType.append_range(type);
@@ -266,22 +318,22 @@ namespace cs
     {
         type_definition mReturnType;
         std::string mName;
-        std::vector<var> mArguments;
+        std::vector<variable> mArguments;
         std::vector<expression> mExpressions;
 
-        function_chunk(type_definition& returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+        function_chunk(type_definition& returnType, const std::string& name, std::initializer_list<variable> arguments, std::initializer_list<expression> expressions)
          : mReturnType(returnType), mName(name), mArguments(arguments), mExpressions(expressions)
         {
 
         }
 
-        function_chunk(std::initializer_list<var> returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+        function_chunk(std::initializer_list<variable> returnType, const std::string& name, std::initializer_list<variable> arguments, std::initializer_list<expression> expressions)
          : mName(name), mArguments(arguments), mExpressions(expressions)
         {
             mReturnType.append_range(returnType);
         }
 
-        function_chunk(data_type returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+        function_chunk(data_type returnType, const std::string& name, std::initializer_list<variable> arguments, std::initializer_list<expression> expressions)
          : mName(name), mArguments(arguments), mExpressions(expressions)
         {
             mReturnType.emplace_back(returnType);
@@ -342,7 +394,7 @@ namespace cs
             return (*this);
         }
 
-        inline shader& layout_location(size_t location, parameter_direction direction, std::initializer_list<var> type, const std::string& name)
+        inline shader& layout_location(size_t location, parameter_direction direction, std::initializer_list<variable> type, const std::string& name)
         {
             this->emplace_back(layout_location_chunk(location, direction, type, name));
             return (*this);
@@ -360,7 +412,7 @@ namespace cs
             return (*this);
         }
 
-        inline shader& layout_binding(size_t binding, std::initializer_list<var> type, const std::string& name)
+        inline shader& layout_binding(size_t binding, std::initializer_list<variable> type, const std::string& name)
         {
             this->emplace_back(layout_binding_chunk(binding, type, name));
             return (*this);
@@ -378,7 +430,7 @@ namespace cs
             return (*this);
         }
 
-        inline shader& layout_builtin(spv::BuiltIn builtIn, parameter_direction direction, std::initializer_list<var> type, const std::string& name)
+        inline shader& layout_builtin(spv::BuiltIn builtIn, parameter_direction direction, std::initializer_list<variable> type, const std::string& name)
         {
             this->emplace_back(layout_builtin_chunk(builtIn, direction, type, name));
             return (*this);
@@ -390,19 +442,19 @@ namespace cs
             return (*this);
         }
 
-        inline shader& function(type_definition& returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+        inline shader& function(type_definition& returnType, const std::string& name, std::initializer_list<variable> arguments, std::initializer_list<expression> expressions)
         {
             this->emplace_back(function_chunk(returnType, name, arguments, expressions));
             return (*this);
         }
 
-        inline shader& function(std::initializer_list<var>& returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+        inline shader& function(std::initializer_list<variable>& returnType, const std::string& name, std::initializer_list<variable> arguments, std::initializer_list<expression> expressions)
         {
             this->emplace_back(function_chunk(returnType, name, arguments, expressions));
             return (*this);
         }
 
-        inline shader& function(data_type returnType, const std::string& name, std::initializer_list<var> arguments, std::initializer_list<expression> expressions)
+        inline shader& function(data_type returnType, const std::string& name, std::initializer_list<variable> arguments, std::initializer_list<expression> expressions)
         {
             this->emplace_back(function_chunk(returnType, name, arguments, expressions));
             return (*this);
